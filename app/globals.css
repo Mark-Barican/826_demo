@@ -387,6 +387,37 @@ body {
   }
 }
 
+/* The loading panel's dead-man switch.
+
+   The panel is now painted by the SERVER and visible in the first frame, so a
+   first-time visitor sees it instead of seeing the site and then having a
+   loading screen dropped on top of it - see components/common/RouteLoader.tsx
+   for the measurements that forced that round.
+
+   The cost of being visible before any script runs is that a script which never
+   runs leaves it there. `<noscript>` covers scripting turned OFF; it cannot
+   cover scripting that is on and broken - a chunk that 404s, a bundle that
+   throws before RouteLoader mounts. This does: after six seconds the panel
+   fades itself out with no JavaScript involved at all.
+
+   `useGSAP` sets `animation: none` on mount, so on a normal load this keyframe
+   is cancelled about half a second in and never runs. The delay is long enough
+   that it cannot race a slow hydration on a bad connection, and short enough
+   that nobody is left staring at a logo.
+
+   Only `opacity` is animated. A transform here would make this element the
+   containing block for every fixed descendant - the rule that broke the pinned
+   hero once already. */
+@keyframes route-loader-failsafe {
+  to {
+    opacity: 0;
+  }
+}
+
+.route-loader {
+  animation: route-loader-failsafe 0.5s linear 6s forwards;
+}
+
 /* ---------------------------------------------------------------------------
    Partner marquee.
 

@@ -44,11 +44,32 @@ export const NAV_END = '826:nav-end';
  * navigation click landed on the panel instead of the link and the page simply
  * never moved. Blocking input for the length of a load is not worth that.
  *
- * IT IS NEVER VISIBLE IN THE SERVER-RENDERED HTML. The overlay ships at
- * `opacity: 0` from an inline style and only GSAP ever raises it. With
- * JavaScript disabled it stays invisible and inert rather than sitting over a
- * page it can never clear - see the note in BrandLoader about `app/loading.tsx`,
- * which is the same failure and the reason that file does not exist.
+ * IT IS PAINTED BY THE SERVER, AND THAT IS THE WHOLE POINT OF THE COLD LOAD.
+ *
+ * This used to ship at `opacity: 0` from an inline style, with only GSAP ever
+ * raising it. That is one hydration too late. Measured on the homepage: the
+ * page painted at 43ms and GSAP brought the panel up at 512ms, so a first-time
+ * visitor got the site, then the loading screen over the top of it, then the
+ * site again. The panel exists to cover a gap; it was arriving after the gap
+ * had closed and manufacturing a second one.
+ *
+ * So the markup carries no opacity at all and the panel is simply visible in
+ * the server HTML, from the very first frame the browser paints. GSAP's job on
+ * a cold load is now to TAKE IT AWAY, not to bring it up.
+ *
+ * TWO THINGS STOP THAT BECOMING A PANEL NOBODY CAN DISMISS, which is the
+ * failure the old ordering was avoiding and is still the one that matters - see
+ * the note in BrandLoader about `app/loading.tsx`, the same failure and the
+ * reason that file does not exist.
+ *
+ *   1. No scripting at all: the `<noscript>` block below removes the panel
+ *      outright, so it is never in the way of a page that has no script to
+ *      clear it.
+ *   2. Scripting that never arrives - a chunk that 404s, a bundle that throws
+ *      before this mounts: `<noscript>` cannot help there, because scripting is
+ *      enabled and merely broken. A CSS keyframe in app/globals.css fades the
+ *      panel out on its own after a few seconds. `useGSAP` cancels it on mount,
+ *      so it only ever runs when nothing else is coming.
  */
 export function RouteLoader() {
   const overlay = useRef<HTMLDivElement>(null);
@@ -59,7 +80,11 @@ export function RouteLoader() {
     const el = overlay.current;
     if (!el) return;
 
-    // Cover immediately - inside the layout effect, so before first paint.
+    // The server already painted the panel, so there is nothing to cover here.
+    // Cancel the CSS failsafe (app/globals.css) and pin the opacity GSAP is
+    // about to animate from, so the keyframe and the tween can never fight over
+    // the same property.
+    el.style.animation = 'none';
     gsap.set(el, { opacity: 1 });
 
     const hide = () => {
@@ -130,13 +155,21 @@ export function RouteLoader() {
   }, []);
 
   return (
-    <div
-      ref={overlay}
-      aria-hidden
-      style={{ opacity: 0 }}
-      className="pointer-events-none fixed inset-0 z-[90]"
-    >
-      <BrandLoader />
-    </div>
+    <>
+      {/* No scripting, no panel. A `<style>` in here is only parsed when
+          scripting is off, which is exactly when a cover nothing can lift is
+          worse than no cover at all. `display` rather than `opacity` so it is
+          gone rather than merely transparent. */}
+      <noscript>
+        <style>{'.route-loader{display:none}'}</style>
+      </noscript>
+      <div
+        ref={overlay}
+        aria-hidden
+        className="route-loader pointer-events-none fixed inset-0 z-[90]"
+      >
+        <BrandLoader />
+      </div>
+    </>
   );
 }
