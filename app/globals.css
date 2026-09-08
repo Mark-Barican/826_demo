@@ -1,26 +1,534 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   HERO BAND
+
+   The viewport is too tall for the hero's 16:9 footage to be cover-fit without
+   cropping into the car. On a 390x844 phone cover-fit keeps 25.6% of the frame
+   width - measured - so you are looking at one door and a wheel while the film
+   sweeps across parts of the car you cannot see. `band` letterboxes instead:
+   the whole composition, smaller, with the type moved off the footage and into
+   the dark above and below it.
+
+   THE BREAKPOINT IS AN ASPECT RATIO, NOT A WIDTH, and it has to be. The hero
+   is the one place on this site where the constraint is the shape of the
+   window rather than how much room there is for text - a short landscape
+   desktop window crops exactly as badly as a tall phone. It is also why this
+   is a media query and not the `mode` value from lib/hero/mode.ts: mode is
+   read once when the hero mounts, and a phone turned on its side has to
+   re-lay-out immediately, without rebuilding the pinned ScrollTrigger.
+
+   KEEP IN STEP WITH `MIN_COVER_ASPECT` in lib/hero/mode.ts, which picks the pin
+   length off the same threshold. Both are inclusive at exactly 4/3.
+   --------------------------------------------------------------------------- */
+@custom-variant hero-band (@media (max-aspect-ratio: 4/3));
+
+/* A short band-mode screen, where the type and the footage are competing.
+   In band mode the video takes the height the type does not, so on a phone this
+   small every line saved here comes back as a bigger car: at 320x568 the copy
+   at its full size left the footage 44px tall - a car 78px wide - and stepping
+   it down gives back a full-width 272x153 strip. 740px clears the common short
+   phones (320x568, 360x640, 375x667) and leaves 390x844 and up alone. */
+@custom-variant hero-band-tight (@media (max-aspect-ratio: 4/3) and (max-height: 740px));
+
+/* ---------------------------------------------------------------------------
+   TONE SYSTEM
+
+   The site alternates between two surfaces - `ink` (near-black) and `paper`
+   (warm light grey). Rather than writing a light variant of every component,
+   each tone redefines the same small set of raw custom properties on itself,
+   and `@theme inline` maps those to Tailwind colour tokens. `bg-surface`,
+   `text-fg`, `border-rule` and `text-accent` therefore resolve differently
+   inside `.tone-paper` without a single descendant selector.
+
+   That last part is load-bearing. A two-part selector like `.tone-paper h2`
+   out-specifies a utility class and silently wins, which is how the numeral in
+   the old running head stayed teal on cream at 2.2:1. Tones swap variables;
+   they never restyle elements by tag.
+
+   Every pairing below was measured, not estimated:
+     ink   fg #f4f4f5 on #08080a ......... 17.6:1
+     ink   fg-muted #a1a1aa on #08080a ...  8.1:1
+     ink   accent #d4af37 on #08080a .....  9.8:1
+     paper fg #08080a on #ecebe8 ......... 16.8:1
+     paper fg-muted #4a4a47 on #ecebe8 ...  7.4:1
+     paper accent #6b5310 on #ecebe8 .....  6.1:1
+     ink   danger #ff8b8b on #08080a .....  8.8:1
+     paper danger #8f1d1d on #ecebe8 .....  7.5:1
+   The danger pair is the form-error voice, and it is a tone variable like every
+   other colour here rather than a hardcoded red, because the booking form sits
+   on ink and a validation message must never be the one thing on the page that
+   does not know which surface it is on. Never signal an error with colour
+   alone: the field also carries `aria-invalid` and names its message through
+   `aria-describedby`.
+   The paper accent is a darkened gold on purpose: brand gold #d4af37 on paper
+   is 1.9:1 and is unreadable as text. Never use --c-accent-brand for type on
+   paper - it exists only for rules, marks and large graphic use.
+--------------------------------------------------------------------------- */
+
+:root,
+.tone-ink {
+  --c-surface: #08080a;
+  --c-surface-raised: #0e0e12;
+  --c-surface-sunken: #050507;
+  --c-fg: #f4f4f5;
+  --c-fg-muted: #a1a1aa;
+  --c-rule: rgba(255, 255, 255, 0.12);
+  --c-rule-soft: rgba(255, 255, 255, 0.06);
+  --c-accent: #d4af37;
+  --c-accent-hover: #e5c158;
+  --c-on-accent: #08080a;
+  --c-danger: #ff8b8b;
+}
+
+.tone-paper {
+  --c-surface: #ecebe8;
+  --c-surface-raised: #e3e1dc;
+  --c-surface-sunken: #dedcd6;
+  --c-fg: #08080a;
+  --c-fg-muted: #4a4a47;
+  --c-rule: rgba(8, 8, 10, 0.18);
+  --c-rule-soft: rgba(8, 8, 10, 0.08);
+  --c-accent: #6b5310;
+  --c-accent-hover: #4f3d0b;
+  --c-on-accent: #ecebe8;
+  --c-danger: #8f1d1d;
+}
+
+/* The literal brand gold, tone-independent. Marks and rules only - see above. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --c-accent-brand: #d4af37;
+  --background: #08080a;
+  --foreground: #f4f4f5;
 }
 
 @theme inline {
+  --color-surface: var(--c-surface);
+  --color-surface-raised: var(--c-surface-raised);
+  --color-surface-sunken: var(--c-surface-sunken);
+  --color-fg: var(--c-fg);
+  --color-fg-muted: var(--c-fg-muted);
+  --color-rule: var(--c-rule);
+  --color-rule-soft: var(--c-rule-soft);
+  --color-danger: var(--c-danger);
+  --color-accent: var(--c-accent);
+  --color-accent-hover: var(--c-accent-hover);
+  --color-on-accent: var(--c-on-accent);
+  --color-brand: var(--c-accent-brand);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  --font-sans: var(--font-grotesque), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-technical), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ---------------------------------------------------------------------------
+   TYPE SCALE
+
+   Three tiers, defined once so they cannot be retyped per component. The old
+   site set every section heading to `text-3xl sm:text-5xl`, so nothing could
+   read as more important than anything else. The ceiling is the point:
+   `.type-display` is reserved for at most three moments site-wide.
+
+   The sans is loaded as a variable font with the `wdth` axis, so the display
+   tier widens rather than just growing - the wide industrial grotesque both
+   reference sites use for their headline voice. The `font-stretch` values below
+   are the reason app/layout.tsx cannot use just any typeface: most variable
+   grotesques stop at width 100 and would clamp these to nothing.
+--------------------------------------------------------------------------- */
+
+.type-display {
+  font-family: var(--font-sans);
+  font-size: clamp(2.75rem, 7.5vw, 7rem);
+  font-stretch: 125%;
+  font-weight: 600;
+  line-height: 0.94;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.type-section {
+  font-family: var(--font-sans);
+  font-size: clamp(1.75rem, 3.6vw, 3.25rem);
+  font-stretch: 112%;
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.018em;
+  text-wrap: balance;
+}
+
+.type-card {
+  font-family: var(--font-sans);
+  font-size: clamp(1.05rem, 1.4vw, 1.3rem);
+  font-stretch: 105%;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+/* The meta / specification voice. Replaces the gold-mono kicker that appeared
+   22 times: same role, but it is a label, not a badge above every heading. */
+.type-meta {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.type-body {
+  font-size: 1.1875rem;
+  line-height: 1.7;
+  max-width: 68ch;
+}
+
+/* Card, list and spec descriptions. These were `text-xs` (12px) and `text-sm`
+   (14px) throughout, which is fine for a label and too small for a sentence a
+   customer is meant to read and act on. */
+.type-detail {
+  font-size: 1.0625rem;
+  line-height: 1.6;
+}
+
+/* Values in a definition list - prices, addresses, spec figures. */
+.type-value {
+  font-size: 1.0625rem;
+  line-height: 1.5;
+}
+
+/* The typographic plate that stands in for a studio with no photograph -
+   components/branches/BranchImage.tsx.
+
+   SIZED IN `cqw`, NOT `vw`, AND THAT IS THE ENTIRE POINT. The same plate is
+   rendered into a frame about 200px tall on a 320px phone and into one about
+   500px tall on the studio page at desktop. It was set in `type-section`, whose
+   clamp bottoms out at 28px because it is a PAGE heading and a page heading
+   should never go below that. In a 200px frame the studio name then wrapped to
+   two lines and pushed the caption clean out of the bottom of the box.
+
+   Container units make the plate a function of the frame it is in, which is the
+   thing that actually varies - the viewport barely correlates with it, because
+   the same viewport gives this frame a fifth of the width on the index and half
+   the page on the studio detail. The `@container` that these resolve against is
+   on the plate itself. */
+.type-plate-name {
+  font-family: var(--font-sans);
+  font-size: clamp(1.05rem, 7cqw, 2.5rem);
+  font-stretch: 112%;
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.018em;
+  text-wrap: balance;
+}
+
+.type-plate-note {
+  font-size: clamp(0.8125rem, 3.6cqw, 1.0625rem);
+  line-height: 1.5;
+}
+
+/* The two hero type steps the `hero-band-tight` variant cannot make on its own.
+   See the HERO BAND note at the top of this file for what they buy.
+
+   THEY HAVE TO LIVE HERE, BELOW `.type-body`. A Tailwind `hero-band-tight:text-*`
+   utility would lose to `.type-body`, because the `.type-*` rules are unlayered
+   and unlayered CSS beats every layered utility in v4 whatever the order. So
+   these are unlayered too - and between two unlayered single-class rules of
+   equal specificity, source order is the only thing left. Written above
+   `.type-body` (where the rest of the hero-band CSS lives) this same block
+   silently did nothing: measured, the supporting line stayed at 19px/1.7 and
+   the footage stayed squeezed.
+
+   Single-class on purpose. Reaching for a tag here - `.hero-tight h1` - would
+   out-specify the utilities the rest of the hero is built from, which is the
+   trap the TONE SYSTEM note describes. */
+@media (max-aspect-ratio: 4/3) and (max-height: 740px) {
+  .hero-tight-heading {
+    font-size: 1.6rem;
   }
+
+  .hero-tight-body {
+    font-size: 0.9375rem;
+    line-height: 1.45;
+  }
+}
+
+/* --------------------------------------------------------------------------- */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #08080a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 0px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+::selection {
+  background: var(--c-accent-brand);
+  color: #08080a;
+}
+
+html {
+  background: #08080a;
+  color: #f4f4f5;
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Focus ring that stays visible on both tones. */
+:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Ruled grids.
+
+   The hairline grid used for cards, packages, studios and the portfolio.
+
+   It used to be drawn by putting `gap-px` and `bg-rule` on the container: the
+   1px gaps let the container's colour show through and read as rules. That
+   works only while every cell of every row is filled. The moment a row is
+   short - seven photographs in a four-column grid, two packages in a
+   three-column one - the container is still painted underneath the cells that
+   do not exist, and the leftover is a large flat slab of rule colour. Mark
+   flagged exactly that on the portfolio and the pricing tables.
+
+   So the rules now belong to the cells, not to the container. Each cell draws
+   its own left and top edge (see RULED_CELL in components/common/RuledGrid.tsx),
+   which means a rule can only ever exist where there is something to rule off.
+   Empty space is simply empty.
+
+   That leaves the outer edges. Drawing a left border on every cell also draws
+   one down the outside of the first column, and a top border on the first row -
+   an L of rule around a grid that previously had no outline at all. Rather than
+   work out which cell is first in a row at each breakpoint, the whole grid is
+   shifted one pixel up and left and those two lines are clipped off.
+
+   The clip is a polygon rather than `overflow: hidden` on purpose. Cells are
+   revealed by translating them DOWN into place (components/common/Reveal.tsx),
+   so the bottom edge has to stay open or the last row is sliced in half for the
+   length of its own animation. The polygon clips the first pixel of the top and
+   left and runs well past the box on the other two sides.
+
+   Rule colour is translucent (--c-rule), so two overlapping borders would read
+   twice as dark as one. Every boundary here is drawn exactly once: by the cell
+   to its right, or the cell below it.
+--------------------------------------------------------------------------- */
+.ruled-grid {
+  margin-top: -1px;
+  margin-left: -1px;
+  clip-path: polygon(1px 1px, 200% 1px, 200% 200%, 1px 200%);
+}
+
+/* ---------------------------------------------------------------------------
+   Package carousel track.
+
+   The pricing packages are a native horizontal scroller with scroll snapping
+   rather than a transformed track, so that swipe, trackpad and keyboard focus
+   all behave the way the platform already behaves - see PackageCarousel in
+   components/pricing/PricingCalculator.tsx. The only thing that needs CSS is
+   the scrollbar: a horizontal bar sitting under the cards would read as page
+   furniture, and the counter, the arrows and the ticks already say where in the
+   track you are. Scrolling itself is untouched.
+
+   This has to out-specify the global `::-webkit-scrollbar` rule above, which it
+   does on the class alone.
+--------------------------------------------------------------------------- */
+.carousel-track {
+  scrollbar-width: none;
+}
+
+.carousel-track::-webkit-scrollbar {
+  display: none;
+}
+
+/* The sweeping rule under the 826 mark on the loading panel. CSS rather than
+   GSAP: the panel can be on screen before any bundle has parsed, and a loading
+   indicator that needs JavaScript to move is one that stops exactly when it
+   matters. */
+@keyframes loader-sweep {
+  0%   { transform: translate3d(-100%, 0, 0); }
+  100% { transform: translate3d(100%, 0, 0); }
+}
+
+.loader-sweep {
+  animation: loader-sweep 0.9s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader-sweep {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Partner marquee.
+
+   The track holds TWO identical halves and slides left by exactly -50%, so the
+   moment the first half has fully left the frame the second is sitting where it
+   started and the loop restarts invisibly.
+
+   Each half repeats the logo set several times over (SETS_PER_HALF in
+   components/home/BrandPartners.tsx). That is not decoration: a -50% translate
+   only reads as seamless if ONE half is at least as wide as the band. Three
+   logos are roughly 700px, so on a wide display the first half cleared the left
+   edge long before the loop restarted and the band went empty for a few seconds
+   before refilling. That was the bug the old studio-name ticker had.
+
+   Duration is set per repeat by the component and multiplied up here, so the
+   logos travel at the same speed no matter how many repeats it takes to fill a
+   given display.
+
+   Motion is frozen rather than removed under prefers-reduced-motion: the band
+   still reads at rest, it just stops travelling.
+--------------------------------------------------------------------------- */
+
+@keyframes marquee-track {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+
+.marquee-track {
+  animation: marquee-track var(--marquee-duration, 48s) linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Partner marquee.
+
+   The track holds TWO identical halves and slides left by exactly -50%, so the
+   moment the first half has fully left the frame the second is sitting where it
+   started and the loop restarts invisibly.
+
+   Each half repeats the logo set several times over (SETS_PER_HALF in
+   components/home/BrandPartners.tsx). That is not decoration: a -50% translate
+   only reads as seamless if ONE half is at least as wide as the band. Three
+   logos are roughly 700px, so on a wide display the first half cleared the left
+   edge long before the loop restarted and the band went empty for a few seconds
+   before refilling. That was the bug the old studio-name ticker had.
+
+   Duration is set per repeat by the component and multiplied up here, so the
+   logos travel at the same speed no matter how many repeats it takes to fill a
+   given display.
+
+   Motion is frozen rather than removed under prefers-reduced-motion: the band
+   still reads at rest, it just stops travelling.
+--------------------------------------------------------------------------- */
+
+@keyframes marquee-track {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+
+.marquee-track {
+  animation: marquee-track var(--marquee-duration, 48s) linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* Vertical service label on the discipline panels. */
+.label-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+}
+
+/* ---------------------------------------------------------------------------
+   MapLibre chrome, restyled to this project's palette.
+
+   mapcn ships these using shadcn's token set (`text-muted-foreground`,
+   `bg-background`), which this project does not define - the build failed on the
+   unknown utility. Written out against our own tokens instead.
+   Deliberately NOT inside `@layer base`: layered rules lose to maplibre's own
+   unlayered stylesheet, which is why the popup rendered white with white text.
+--------------------------------------------------------------------------- */
+.maplibregl-popup .maplibregl-popup-content {
+  background: #0e0e12;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0;
+  padding: 0.85rem 0.95rem;
+  box-shadow: none;
+  color: #f4f4f5;
+}
+/* mapcn wraps every popup in its own card using shadcn's `bg-popover` /
+   `text-popover-foreground` / `border-border`. None of those exist here, so the
+   background resolved to transparent and the border fell back to currentColor -
+   a bright white ring drawn inside our dark popup, plus a second lot of padding.
+   Measured: 1px solid rgb(244,244,245). The `.maplibregl-popup-content` rule
+   above is already the card, so this wrapper should be nothing at all. */
+.maplibregl-popup .bg-popover {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  max-width: none;
+  box-shadow: none;
+}
+
+.maplibregl-popup .maplibregl-popup-tip {
+  display: none;
+}
+.maplibregl-popup .maplibregl-popup-close-button {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 1.1rem;
+  padding: 0 0.35rem;
+  background: transparent;
+}
+.maplibregl-popup .maplibregl-popup-close-button:hover {
+  color: #fff;
+  background: transparent;
+}
+.maplibregl-ctrl-attrib {
+  background: #0e0e12;
+  color: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  box-shadow: none;
+}
+.maplibregl-ctrl-attrib a { color: rgba(255, 255, 255, 0.55); }
+.maplibregl-ctrl-attrib a:hover { color: #f4f4f5; }
+.maplibregl-ctrl-attrib-button { background: transparent; filter: invert(1); }
+.maplibregl-ctrl .maplibregl-ctrl-group, .maplibregl-ctrl-group {
+  background: #0e0e12;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  box-shadow: none;
+}
+.maplibregl-ctrl-group button + button { border-top: 1px solid rgba(255,255,255,0.1); }
+.maplibregl-ctrl-group button span { filter: invert(1); }

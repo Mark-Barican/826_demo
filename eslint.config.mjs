@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored verbatim from the shadcn / mapcn registries so it can be
+    // re-pulled and diffed against upstream. Lint our own code, not theirs.
+    "components/ui/**",
   ]),
 ]);
 
